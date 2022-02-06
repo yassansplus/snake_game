@@ -1,5 +1,6 @@
 import sys, random
 import pygame
+import csv
 
 
 class Game:
@@ -38,12 +39,19 @@ class Game:
         self.beginning_screen = True
 
         self.head_snake = pygame.image.load('steve.png')
-
+        self.apple_image = pygame.image.load('apple.png')
+        self.apple_image = pygame.transform.scale(self.apple_image, (10, 10))
         # Charger l'image
 
         self.image = pygame.image.load('presentation.jpeg')
         # retrecir l'image
         self.image_title = pygame.transform.scale(self.image, (100, 100))
+
+        # Dernier écran
+        self.image_end = pygame.image.load('game_over.png')
+        self.image_end = pygame.transform.scale(self.image_end, (245, 175))
+        self.scores = []
+        self.end_screen = False
 
         # creer la variable score
 
@@ -52,80 +60,17 @@ class Game:
     def main(self):
 
         self.introduction()
-
         self.game()
-
-    def game_limit(self):
-        # afficher les limites du jeu
-
-        pygame.draw.rect(self.display, (255, 255, 255), (100, 100, 600, 500), 3)
-
-    def snake_movement(self):
-
-        # faire bouger le serpent
-
-        self.snake_pos_x += self.snake_direction_x  # faire bouger le serpent a gauche ou a droite
-        self.snake_pos_y += self.snake_direction_y  # faire bouger le serpent en haut ou en bas
-
-        # print(self.serpent_position_x,self.serpent_position_y)
-
-    def display_element(self):
-
-        self.display.fill((0, 0, 0))  # attriubue la couleur noir a l'ecran
-
-        self.display.blit(self.head_snake, (self.snake_pos_x, self.snake_pos_y,
-                                            self.snake_body, self.snake_body))
-
-        # afficher la pomme
-        pygame.draw.rect(self.display, (255, 0, 0),
-                         (self.apple_pos_x, self.apple_pos_y, self.apple, self.apple))
-
-        self.display_snake()
-
-    def display_snake(self):
-        # afficher les autres parties du serpent
-
-        for partie_du_serpent in self.snake_pos[:-1]:
-            pygame.draw.rect(self.display, (0, 255, 0),
-                             (partie_du_serpent[0], partie_du_serpent[1], self.snake_body, self.snake_body))
-
-    def bite_himself(self, snake_head):
-
-        # le serpent se mord
-
-        for snake_parts in self.snake_pos[:-1]:
-            if snake_parts == snake_head:
-                sys.exit()
-
-    # creer une fonction qui permet d'afficher des messages
-
-    def create_messsage(self, font, message, message_rectangle, couleur):
-
-        if font == 's':
-            font = pygame.font.SysFont('Minecraft', 15, False)
-
-        elif font == 'm':
-            font = pygame.font.SysFont('Minecraft', 25, False)
-
-        elif font == 'l':
-            font = pygame.font.SysFont('Minecrat', 35, True)
-
-        message = font.render(message, True, couleur)
-
-        self.display.blit(message, message_rectangle)
-
-    # Créer une fonction permettant d'enregistrer les score dans un CSV
-    def saveScore(self):
-        print('Score enregistré')
+        self.read_scores()
+        self.score_panel()
 
     # Ecran de démarrage
     def introduction(self):
-        # permet de gerer les evenements , d'afficher certains composants du jeu grace au while loop
 
         while self.beginning_screen:
 
             for event in pygame.event.get():  # verifier les evenements lorsque le jeu est en cours
-                # print(evenement)
+                # print(event)
                 if event.type == pygame.QUIT:
                     sys.exit()
 
@@ -140,8 +85,10 @@ class Game:
                 elif event.type == pygame.QUIT:
                     sys.exit()
 
+                # Joli fond noir des familles
                 self.display.fill((0, 0, 0))
 
+                # On place l'image du jeu Snake
                 self.display.blit(self.image_title, (350, 50, 100, 50))
 
                 self.create_messsage('s', 'Bon, on vous appelle comment dans le comte? '
@@ -161,14 +108,9 @@ class Game:
     def game(self):
         while self.is_launched:
 
-            # creer un while loop pour creer l'ecran de debut /events /afficher l'image ...
-
             for event in pygame.event.get():  # verifier les evenements lorsque le jeu est en cours
-                # print(evenement)
                 if event.type == pygame.QUIT:
                     sys.exit()
-
-                # creer les evenements qui permettent de bouger le serpent
 
                 if event.type == pygame.KEYDOWN:
 
@@ -176,35 +118,31 @@ class Game:
                         # lorsque l'on presse la touche 'fleche droite'
                         self.snake_direction_x = 10
                         self.snake_direction_y = 0
-                        # print('Droite')
 
                     if event.key == pygame.K_LEFT:
                         # lorsque l'on presse la touche 'fleche gauche'
-
                         self.snake_direction_x = -10
                         self.snake_direction_y = 0
-                        # print('LEFT')
 
                     if event.key == pygame.K_DOWN:
                         # lorsque l'on presse la touche 'fleche vers le  bas'
-
                         self.snake_direction_y = 10
                         self.snake_direction_x = 0
-                        # print('En bas')
 
                     if event.key == pygame.K_UP:
                         # lorsque l'on presse la touche 'fleche vers le haut'
-
                         self.snake_direction_y = -10
                         self.snake_direction_x = 0
-                        # print('En haut ')
 
             # faire bouger le serpent si il se trouve dans les limites du jeu
 
             if self.snake_pos_x <= 100 or self.snake_pos_x >= 700 \
                     or self.snake_pos_y <= 100 or self.snake_pos_y >= 600:
-                # si la position du serpent depasse les limites alors le jeu s'arrete
-                sys.exit()
+                # si la position du serpent depasse les limites alors le jeu s'arrete on enregistre le score et on
+                # l'envoie vers le dernier screen
+                self.save_score()
+                self.is_launched = False
+                self.end_screen = True
 
             self.snake_movement()
 
@@ -248,6 +186,118 @@ class Game:
             self.clock.tick(15)
 
             pygame.display.flip()  # mettre a jour l'ecran
+
+    # Créer une fonction permettant d'enregistrer les score dans un CSV
+    def save_score(self):
+        score_ladder = open('score.csv', 'a')
+        score_ladder.write('\n' + self.name + ";" + str(self.score) + "")
+        score_ladder.close()
+
+    def read_scores(self):
+        with open('score.csv', newline='') as csvfile:
+            scores = csv.reader(csvfile, delimiter=';')
+            for score in scores:
+                self.scores.append(score)
+
+    def score_panel(self):
+        while self.end_screen:
+
+            for event in pygame.event.get():  # verifier les evenements lorsque le jeu est en cours
+                height_pos = 280
+                print_max = 0
+                # print(evenement)
+                if event.type == pygame.QUIT:
+                    sys.exit()
+
+                # Saisie du nom et check avant la partie
+                if event.type == pygame.KEYDOWN:
+                    # if event.key == pygame.K_RETURN:
+                    #     self.beginning_screen = False
+                    #     self.end_screen = False
+                    #     self.is_launched = True
+                    #     self.main()
+                    if event.key == pygame.K_ESCAPE:
+                        sys.exit()
+                if event.type == pygame.QUIT:
+                    sys.exit()
+
+                self.display.fill((0, 0, 0))
+
+                self.display.blit(self.image_end, (270, 50, 100, 50))
+
+                self.create_messsage('m', 'Appuyer sur ESC pour quitter', (50, 500, 200, 5),
+                                     (200, 255, 255))
+                self.create_messsage('s', 'Votre score '
+                                     , (200, 250, 200, 5), (240, 240, 240))
+
+                for score in self.scores[::-1]:
+                    if (print_max == 10):
+                        break
+                    self.create_messsage('s', score[0] + ": " + score[1],
+                                         (250, height_pos, 200, 5), (240, 240, 240))
+                    height_pos += 20
+                    print_max += 1
+
+            pygame.display.flip()
+
+    def game_limit(self):
+        # afficher les limites du jeu
+
+        pygame.draw.rect(self.display, (255, 255, 255), (100, 100, 600, 500), 3)
+
+    def snake_movement(self):
+
+        # faire bouger le serpent
+
+        self.snake_pos_x += self.snake_direction_x  # faire bouger le serpent a gauche ou a droite
+        self.snake_pos_y += self.snake_direction_y  # faire bouger le serpent en haut ou en bas
+
+        # print(self.serpent_position_x,self.serpent_position_y)
+
+    def display_element(self):
+
+        self.display.fill((0, 0, 0))  # attriubue la couleur noir a l'ecran
+
+        self.display.blit(self.head_snake, (self.snake_pos_x, self.snake_pos_y,
+                                            self.snake_body, self.snake_body))
+        #On affiche le bol de ramen
+        self.display.blit(self.apple_image, (self.apple_pos_x, self.apple_pos_y, self.apple, self.apple))
+
+
+        self.display_snake()
+
+    def display_snake(self):
+        # afficher les autres parties du serpent
+        for partie_du_serpent in self.snake_pos[:-1]:
+            pygame.draw.rect(self.display, (64, 175, 175),
+                             (partie_du_serpent[0], partie_du_serpent[1], self.snake_body, self.snake_body))
+
+    def bite_himself(self, snake_head):
+
+        # le serpent se mord
+
+        for snake_parts in self.snake_pos[:-1]:
+            if snake_parts == snake_head:
+                self.save_score()
+                self.is_launched = False
+                self.end_screen = True
+
+    # creer une fonction qui permet d'afficher des messages
+
+    def create_messsage(self, font, message, message_rectangle, couleur):
+
+        if font == 's':
+            font = pygame.font.SysFont('Minecraft', 15, False)
+
+        elif font == 'm':
+            font = pygame.font.SysFont('Minecraft', 25, False)
+
+        elif font == 'l':
+            font = pygame.font.SysFont('Minecrat', 35, True)
+
+        message = font.render(message, True, couleur)
+
+        self.display.blit(message, message_rectangle)
 
 
 if __name__ == '__main__':
